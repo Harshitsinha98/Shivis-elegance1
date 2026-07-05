@@ -1,29 +1,49 @@
 import type { NextRequest } from "next/server";
-import { ok, fail } from "@/lib/api";
+import { ok } from "@/lib/api";
 import { mapShiprocketStatus } from "@/lib/shipping/shiprocket";
 import { getOrderByAwb, getOrderByNumber, updateOrderStatus } from "@/lib/db/repo";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * GET /api/webhooks/shiprocket — reachability check.
+ * Shiprocket (and uptime probes) may hit the URL with GET when you click
+ * "Test & Save"; it rejects the URL ("address is not allowed") unless it gets
+ * a 2xx. Ack so the endpoint validates.
+ */
+export async function GET() {
+  return ok({ received: true, endpoint: "shiprocket-webhook" });
+}
+
 /** POST /api/webhooks/shiprocket — shipment status updates (NDR, delivered, etc.). */
 export async function POST(req: NextRequest) {
-  // Shiprocket signs webhooks with a token you configure in their dashboard.
+  // Shiprocket sends the token it manages for this webhook in `x-api-key`.
+  // We verify it before mutating anything, but IMPORTANT: we still return 200
+  // on a mismatch. Shiprocket disables webhooks that ever return a non-2xx
+  // (that's the "address is not allowed" failure on Test & Save), so we ack
+  // every request and simply skip processing unauthorized ones.
   const token = req.headers.get("x-api-key");
   const expected = process.env.SHIPROCKET_WEBHOOK_TOKEN;
-  if (expected && token !== expected) {
-    return fail("Invalid webhook token", 401);
-  }
+  const authorized = !expected || token === expected;
 
   let event: {
     current_status?: string;
     awb?: string;
     order_id?: string;
     courier_name?: string;
-  };
+  } = {};
   try {
     event = await req.json();
   } catch {
-    return fail("Invalid payload");
+    // Empty/non-JSON body (e.g. Shiprocket's validation ping) — just ack.
+    return ok({ received: true, authorized, matched: false });
+  }
+
+  if (!authorized) {
+    // Token didn't match. Ack so Shiprocket keeps the webhook enabled, but do
+    // not touch any order. If this is the value Shiprocket actually sends,
+    // copy it from your Vercel logs into SHIPROCKET_WEBHOOK_TOKEN.
+    return ok({ received: true, authorized: false, matched: false });
   }
 
   const mapped = mapShiprocketStatus(event.current_status);

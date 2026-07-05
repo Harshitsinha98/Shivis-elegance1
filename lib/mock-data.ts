@@ -391,6 +391,33 @@ export const PRODUCTS: Product[] = [
     tags: ["signet", "gold", "unisex"],
     createdAt: "2026-05-29T00:00:00.000Z",
   },
+  {
+    id: "p13",
+    slug: "petite-silver-stud",
+    name: "Petite Silver Stud",
+    tagline: "An everyday sterling silver stud",
+    description:
+      "A minimalist 4mm sterling silver stud — light, hypoallergenic and perfect for daily wear. Offered as an entry-price piece for order and delivery testing.",
+    price: 25000,
+    currency: "INR",
+    category: "earrings",
+    collectionSlugs: ["essentials"],
+    metal: "sterling-silver",
+    gemstone: "none",
+    purity: "925",
+    weightGrams: 0.8,
+    images: [
+      IMG("photo-1535632066927-ab7c9ab60908"),
+      IMG("photo-1611591437281-460bfbe1220a"),
+    ],
+    variants: [],
+    rating: 4.6,
+    reviewCount: 5,
+    stock: 50,
+    isNew: true,
+    tags: ["silver", "stud", "everyday", "test"],
+    createdAt: "2026-07-05T00:00:00.000Z",
+  },
 ];
 
 export const COLLECTIONS: Collection[] = [
@@ -448,6 +475,7 @@ export const COLLECTIONS: Collection[] = [
       "orion-diamond-studs",
       "estelle-layered-necklace",
       "atlas-signet-ring",
+      "petite-silver-stud",
     ],
   },
   {
