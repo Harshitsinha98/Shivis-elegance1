@@ -981,6 +981,28 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
       createdAt: now,
     };
   }
+  // Link items to catalogue rows only for products that actually exist in the
+  // DB. The catalogue is served from mock-data, so a product can be orderable
+  // without a Product row (e.g. newly added items). Passing a dangling
+  // productId would violate the OrderItem→Product foreign key and 500 the whole
+  // checkout — so unknown products are stored with productId=null; the item
+  // still keeps its slug/name/image/price, so the order is fully intact.
+  const orderedIds = input.items
+    .map((it) => it.productId)
+    .filter(Boolean) as string[];
+  const knownIds = orderedIds.length
+    ? new Set(
+        (
+          await db()
+            .product.findMany({
+              where: { id: { in: orderedIds } },
+              select: { id: true },
+            })
+            .catch(() => [] as { id: string }[])
+        ).map((p) => p.id)
+      )
+    : new Set<string>();
+
   const row = await db().order.create({
     data: {
       number: input.number,
@@ -1001,7 +1023,8 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
       shippingAddress: input.shippingAddress,
       items: {
         create: input.items.map((it) => ({
-          productId: it.productId || null,
+          productId:
+            it.productId && knownIds.has(it.productId) ? it.productId : null,
           slug: it.slug,
           name: it.name,
           image: it.image,
