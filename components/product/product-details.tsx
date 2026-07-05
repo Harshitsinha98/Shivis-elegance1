@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Stars } from "@/components/shared/stars";
 import { useCart } from "@/hooks/use-cart";
 import { useWishlist } from "@/hooks/use-wishlist";
+import { DeliveryEstimator } from "@/components/product/delivery-estimator";
 
 export function ProductDetails({ product }: { product: Product }) {
   const { addItem, openCart } = useCart();
@@ -140,6 +141,11 @@ export function ProductDetails({ product }: { product: Product }) {
           <Heart size={18} className={wished ? "fill-champagne text-champagne" : ""} />
         </Button>
       </div>
+
+      <DeliveryEstimator
+        weightGrams={product.weightGrams}
+        productPrice={product.price}
+      />
 
       <dl className="grid grid-cols-2 gap-4 rounded-xl bg-beige/60 p-5 text-sm">
         <div>
