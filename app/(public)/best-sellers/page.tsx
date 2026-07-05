@@ -1,10 +1,12 @@
-import { BEST_SELLERS } from "@/lib/mock-data";
+import { getBestSellers } from "@/lib/db/repo";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProductGrid } from "@/components/product/product-grid";
 
 export const metadata = { title: "Best Sellers" };
+export const revalidate = 60;
 
-export default function BestSellersPage() {
+export default async function BestSellersPage() {
+  const bestSellers = await getBestSellers();
   return (
     <>
       <PageHeader
@@ -14,7 +16,7 @@ export default function BestSellersPage() {
         crumbs={[{ label: "Home", href: "/" }, { label: "Best Sellers" }]}
       />
       <div className="container-luxe py-14">
-        <ProductGrid products={BEST_SELLERS} />
+        <ProductGrid products={bestSellers} />
       </div>
     </>
   );

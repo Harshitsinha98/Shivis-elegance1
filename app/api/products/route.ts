@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { queryProducts, getProductBySlug } from "@/lib/mock-data";
+import { listProducts, getProduct } from "@/lib/db/repo";
 import { ok, fail } from "@/lib/api";
 import type { ProductQuery } from "@/types/api";
 
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const slug = sp.get("slug");
   if (slug) {
-    const product = getProductBySlug(slug);
+    const product = await getProduct(slug);
     return product ? ok(product) : fail("Product not found", 404);
   }
 
@@ -28,5 +28,5 @@ export async function GET(req: NextRequest) {
     pageSize: sp.get("pageSize") ? Number(sp.get("pageSize")) : 12,
   };
 
-  return ok(queryProducts(query));
+  return ok(await listProducts(query));
 }

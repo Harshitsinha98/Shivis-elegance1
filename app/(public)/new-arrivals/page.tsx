@@ -1,10 +1,12 @@
-import { NEW_ARRIVALS } from "@/lib/mock-data";
+import { getNewArrivals } from "@/lib/db/repo";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProductGrid } from "@/components/product/product-grid";
 
 export const metadata = { title: "New Arrivals" };
+export const revalidate = 60;
 
-export default function NewArrivalsPage() {
+export default async function NewArrivalsPage() {
+  const newArrivals = await getNewArrivals();
   return (
     <>
       <PageHeader
@@ -14,7 +16,7 @@ export default function NewArrivalsPage() {
         crumbs={[{ label: "Home", href: "/" }, { label: "New Arrivals" }]}
       />
       <div className="container-luxe py-14">
-        <ProductGrid products={NEW_ARRIVALS} emptyMessage="New pieces are on their way." />
+        <ProductGrid products={newArrivals} emptyMessage="New pieces are on their way." />
       </div>
     </>
   );

@@ -1,12 +1,14 @@
-import { PRODUCTS, COUPONS } from "@/lib/mock-data";
+import { listAllProducts, listCoupons } from "@/lib/db/repo";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProductGrid } from "@/components/product/product-grid";
 import { Badge } from "@/components/ui/badge";
 
 export const metadata = { title: "Offers" };
+export const revalidate = 60;
 
-export default function OffersPage() {
-  const onSale = PRODUCTS.filter((p) => p.compareAtPrice && p.compareAtPrice > p.price);
+export default async function OffersPage() {
+  const [products, COUPONS] = await Promise.all([listAllProducts(), listCoupons()]);
+  const onSale = products.filter((p) => p.compareAtPrice && p.compareAtPrice > p.price);
 
   return (
     <>

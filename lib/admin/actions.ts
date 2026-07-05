@@ -29,6 +29,22 @@ function toPaise(major: number): number {
   return Math.round(Number(major) * 100);
 }
 
+/**
+ * Revalidate the public storefront after a catalogue change. The storefront now
+ * reads live from the DB, so every page that shows products must be purged for
+ * an admin edit to appear without waiting for the ISR window.
+ */
+function revalidateStorefront() {
+  revalidatePath("/");
+  revalidatePath("/shop");
+  revalidatePath("/new-arrivals");
+  revalidatePath("/best-sellers");
+  revalidatePath("/offers");
+  revalidatePath("/collections");
+  revalidatePath("/collections/[slug]", "page");
+  revalidatePath("/products/[slug]", "page");
+}
+
 // ──────────────────────────── products ────────────────────────────
 
 export async function saveProductAction(
@@ -105,6 +121,7 @@ export async function saveProductAction(
     revalidatePath("/admin/products");
     revalidatePath("/admin/inventory");
     revalidatePath("/admin");
+    revalidateStorefront();
     return { ok: true, data: { slug: product.slug } };
   } catch (e: any) {
     return {
@@ -124,6 +141,7 @@ export async function deleteProductAction(id: string): Promise<ActionResult> {
     await repo.deleteProduct(id);
     revalidatePath("/admin/products");
     revalidatePath("/admin/inventory");
+    revalidateStorefront();
     return { ok: true };
   } catch {
     return { ok: false, error: "Could not delete product" };
@@ -140,6 +158,7 @@ export async function setStockAction(
     await repo.setProductStock(id, stock);
     revalidatePath("/admin/inventory");
     revalidatePath("/admin/products");
+    revalidateStorefront();
     return { ok: true };
   } catch {
     return { ok: false, error: "Could not update stock" };
@@ -201,6 +220,7 @@ export async function scanAddStockAction(
     if (!product) return { ok: false, error: `No product found for SKU “${sku}”` };
     revalidatePath("/admin/inventory");
     revalidatePath("/admin/products");
+    revalidateStorefront();
     return { ok: true, data: { name: product.name, stock: product.stock } };
   } catch {
     return { ok: false, error: "Could not update stock" };
@@ -235,6 +255,7 @@ export async function createCouponAction(
       active: true,
     });
     revalidatePath("/admin/coupons");
+    revalidatePath("/offers");
     return { ok: true };
   } catch (e: any) {
     return {
@@ -256,6 +277,7 @@ export async function toggleCouponAction(
   try {
     await repo.setCouponActive(code, active);
     revalidatePath("/admin/coupons");
+    revalidatePath("/offers");
     return { ok: true };
   } catch {
     return { ok: false, error: "Could not update coupon" };
@@ -268,6 +290,7 @@ export async function deleteCouponAction(code: string): Promise<ActionResult> {
   try {
     await repo.deleteCoupon(code);
     revalidatePath("/admin/coupons");
+    revalidatePath("/offers");
     return { ok: true };
   } catch {
     return { ok: false, error: "Could not delete coupon" };

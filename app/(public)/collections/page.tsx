@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { COLLECTIONS, getProductsByCollection } from "@/lib/mock-data";
+import { listCollections } from "@/lib/db/repo";
 import { PageHeader } from "@/components/shared/page-header";
 import { ScrollReveal, StaggerGroup } from "@/components/shared/scroll-reveal";
 
 export const metadata = { title: "Collections" };
+export const revalidate = 60;
 
-export default function CollectionsPage() {
+export default async function CollectionsPage() {
+  const COLLECTIONS = await listCollections();
   return (
     <>
       <PageHeader
@@ -31,7 +33,7 @@ export default function CollectionsPage() {
               <div className="absolute inset-0 bg-gradient-to-t from-obsidian/75 via-obsidian/20 to-transparent" />
               <div className="absolute bottom-8 left-8 right-8 text-ivory">
                 <p className="text-xs uppercase tracking-[0.2em] text-champagne-light">
-                  {getProductsByCollection(col.slug).length} pieces
+                  {col.productSlugs.length} pieces
                 </p>
                 <h2 className="mt-2 font-display text-3xl">{col.name}</h2>
                 <p className="mt-1 max-w-md text-sm text-ivory/80">{col.description}</p>

@@ -1,15 +1,18 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import {
-  getCollectionBySlug,
+  getCollection,
   getProductsByCollection,
-  COLLECTIONS,
-} from "@/lib/mock-data";
+  listCollections,
+} from "@/lib/db/repo";
 import { ProductGrid } from "@/components/product/product-grid";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 
-export function generateStaticParams() {
-  return COLLECTIONS.map((c) => ({ slug: c.slug }));
+export const revalidate = 60;
+
+export async function generateStaticParams() {
+  const collections = await listCollections();
+  return collections.map((c) => ({ slug: c.slug }));
 }
 
 export async function generateMetadata({
@@ -18,7 +21,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const col = getCollectionBySlug(slug);
+  const col = await getCollection(slug);
   return col ? { title: col.name, description: col.description } : { title: "Not found" };
 }
 
@@ -28,10 +31,10 @@ export default async function CollectionPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const collection = getCollectionBySlug(slug);
+  const collection = await getCollection(slug);
   if (!collection) notFound();
 
-  const products = getProductsByCollection(slug);
+  const products = await getProductsByCollection(slug);
 
   return (
     <>

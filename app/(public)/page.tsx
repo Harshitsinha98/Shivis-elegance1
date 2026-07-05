@@ -10,6 +10,9 @@ import { BestSellers } from "@/components/home/best-seller";
 import { Testimonials } from "@/components/home/testimonials";
 import { InstagramGallery } from "@/components/home/instagram-gallery";
 
+// New-arrivals & best-sellers read live from the DB — refresh at most hourly.
+export const revalidate = 60;
+
 export default function HomePage() {
   return (
     <>

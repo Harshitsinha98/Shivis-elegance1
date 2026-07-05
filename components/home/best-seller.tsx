@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { BEST_SELLERS } from "@/lib/mock-data";
+import { getBestSellers } from "@/lib/db/repo";
 import { ProductGrid } from "@/components/product/product-grid";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 
-export function BestSellers() {
+export async function BestSellers() {
+  const bestSellers = await getBestSellers();
   return (
     <section className="bg-cream">
       <div className="container-luxe section-padding">
@@ -21,7 +22,7 @@ export function BestSellers() {
           </Link>
         </ScrollReveal>
 
-        <ProductGrid products={BEST_SELLERS.slice(0, 4)} />
+        <ProductGrid products={bestSellers.slice(0, 4)} />
       </div>
     </section>
   );

@@ -2,20 +2,20 @@
 
 import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { PRODUCTS } from "@/lib/mock-data";
+import type { Product } from "@/types/product";
 import { SORT_OPTIONS } from "@/lib/constants";
 import { useProductFilters } from "@/hooks/use-product-filters";
 import { ProductFilters } from "@/components/product/product-filters";
 import { ProductGrid } from "@/components/product/product-grid";
 import { Select } from "@/components/ui/input";
 
-export function ShopClient() {
+export function ShopClient({ products }: { products: Product[] }) {
   const params = useSearchParams();
   const category = params.get("category") ?? undefined;
   const q = params.get("q") ?? undefined;
 
   const { filters, filtered, toggleIn, setField, reset, activeCount } = useProductFilters(
-    PRODUCTS,
+    products,
     { categories: category ? [category] : [], q: q ?? "" }
   );
 

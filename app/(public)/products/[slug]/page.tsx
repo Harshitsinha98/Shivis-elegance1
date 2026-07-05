@@ -3,18 +3,23 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import {
-  getProductBySlug,
+  getProduct,
   getReviewsForProduct,
   getRelatedProducts,
-  PRODUCTS,
-} from "@/lib/mock-data";
+  listAllProducts,
+} from "@/lib/db/repo";
 import { ProductGallery } from "@/components/product/product-gallery";
 import { ProductDetails } from "@/components/product/product-details";
 import { ReviewSection } from "@/components/product/reveiw-section";
 import { ProductGrid } from "@/components/product/product-grid";
 
-export function generateStaticParams() {
-  return PRODUCTS.map((p) => ({ slug: p.slug }));
+// Read live catalogue data from the DB; re-check at most once a minute so admin
+// edits still surface even if an explicit revalidate is ever missed.
+export const revalidate = 60;
+
+export async function generateStaticParams() {
+  const products = await listAllProducts();
+  return products.map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({
@@ -23,7 +28,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProduct(slug);
   if (!product) return { title: "Not found" };
   return {
     title: product.name,
@@ -38,11 +43,13 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProduct(slug);
   if (!product) notFound();
 
-  const reviews = getReviewsForProduct(product.id);
-  const related = getRelatedProducts(product);
+  const [reviews, related] = await Promise.all([
+    getReviewsForProduct(product.id),
+    getRelatedProducts(product),
+  ]);
 
   return (
     <div className="container-luxe py-10">

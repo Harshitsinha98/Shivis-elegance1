@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { NEW_ARRIVALS } from "@/lib/mock-data";
+import { getNewArrivals } from "@/lib/db/repo";
 import { ProductGrid } from "@/components/product/product-grid";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 
-export function NewArrivals() {
+export async function NewArrivals() {
+  const newArrivals = await getNewArrivals();
   return (
     <section className="container-luxe section-padding">
       <ScrollReveal className="mb-12 flex items-end justify-between">
@@ -20,7 +21,7 @@ export function NewArrivals() {
         </Link>
       </ScrollReveal>
 
-      <ProductGrid products={NEW_ARRIVALS.slice(0, 4)} />
+      <ProductGrid products={newArrivals.slice(0, 4)} />
     </section>
   );
 }
