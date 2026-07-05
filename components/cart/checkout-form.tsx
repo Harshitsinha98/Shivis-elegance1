@@ -7,6 +7,7 @@ import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/shared/loading-screen";
 import { useCart } from "@/hooks/use-cart";
+import { DeliveryEstimator } from "@/components/product/delivery-estimator";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
 import { sendPhoneOtp, confirmPhoneAndGetIdToken } from "@/lib/firebase/auth-actions";
 import type { ConfirmationResult } from "firebase/auth";
@@ -536,6 +537,11 @@ export function CheckoutForm() {
             <option>United Kingdom</option>
           </Select>
         </div>
+        {form.country === "India" && (
+          <div className="mt-4">
+            <DeliveryEstimator subtotal={totals.subtotal} pincode={form.postalCode} />
+          </div>
+        )}
       </section>
 
       <section>

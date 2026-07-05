@@ -144,7 +144,7 @@ export function ProductDetails({ product }: { product: Product }) {
 
       <DeliveryEstimator
         weightGrams={product.weightGrams}
-        productPrice={product.price}
+        subtotal={product.price}
       />
 
       <dl className="grid grid-cols-2 gap-4 rounded-xl bg-beige/60 p-5 text-sm">

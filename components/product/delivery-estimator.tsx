@@ -16,27 +16,34 @@ interface RateResult {
 const PIN_KEY = "lj_pincode";
 
 /**
- * Pincode → estimated delivery date widget for the product page.
- * Hits POST /api/shipping (Shiprocket serviceability) and turns the returned
- * `estimatedDays` into a friendly delivery date. Remembers the last pincode so
- * a returning shopper sees an estimate straight away.
+ * Pincode → estimated delivery date widget backed by Shiprocket serviceability
+ * (POST /api/shipping). Two modes:
+ *  - Uncontrolled (product page): renders its own pincode input, remembers the
+ *    last pincode in localStorage and auto-estimates on revisit.
+ *  - Controlled (checkout): pass `pincode` from the address form — the input is
+ *    hidden and the estimate refreshes (debounced) as the shopper types.
  */
 export function DeliveryEstimator({
-  weightGrams,
-  productPrice,
+  weightGrams = 200,
+  subtotal,
+  pincode: controlledPincode,
 }: {
-  weightGrams: number;
-  productPrice: number;
+  weightGrams?: number;
+  /** For the free-shipping decision: product price, or cart subtotal at checkout. */
+  subtotal: number;
+  /** When provided, the widget is controlled by this pincode (no own input). */
+  pincode?: string;
 }) {
+  const controlled = controlledPincode !== undefined;
   const [pincode, setPincode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rate, setRate] = useState<RateResult | null>(null);
 
   const check = useCallback(
-    async (pin: string) => {
+    async (pin: string, opts?: { silent?: boolean }) => {
       if (!/^\d{6}$/.test(pin)) {
-        setError("Enter a valid 6-digit pincode");
+        if (!opts?.silent) setError("Enter a valid 6-digit pincode");
         setRate(null);
         return;
       }
@@ -55,10 +62,12 @@ export function DeliveryEstimator({
         const json = await res.json();
         if (!json.ok) throw new Error(json.error || "Delivery lookup failed");
         setRate(json.data as RateResult);
-        try {
-          localStorage.setItem(PIN_KEY, pin);
-        } catch {
-          /* storage unavailable — non-fatal */
+        if (!controlled) {
+          try {
+            localStorage.setItem(PIN_KEY, pin);
+          } catch {
+            /* storage unavailable — non-fatal */
+          }
         }
       } catch (e) {
         setError((e as Error).message || "Could not check delivery");
@@ -66,11 +75,12 @@ export function DeliveryEstimator({
         setLoading(false);
       }
     },
-    [weightGrams]
+    [weightGrams, controlled]
   );
 
-  // On mount: restore the last pincode and show its estimate immediately.
+  // Uncontrolled: restore the last pincode and show its estimate immediately.
   useEffect(() => {
+    if (controlled) return;
     let saved: string | null = null;
     try {
       saved = localStorage.getItem(PIN_KEY);
@@ -79,9 +89,22 @@ export function DeliveryEstimator({
     }
     if (saved && /^\d{6}$/.test(saved)) {
       setPincode(saved);
-      check(saved);
+      check(saved, { silent: true });
     }
-  }, [check]);
+  }, [controlled, check]);
+
+  // Controlled: debounce-estimate whenever the form's pincode changes.
+  useEffect(() => {
+    if (!controlled) return;
+    const pin = (controlledPincode || "").trim();
+    if (!/^\d{6}$/.test(pin)) {
+      setRate(null);
+      setError(null);
+      return;
+    }
+    const t = setTimeout(() => check(pin, { silent: true }), 500);
+    return () => clearTimeout(t);
+  }, [controlled, controlledPincode, check]);
 
   const deliveryDate =
     rate &&
@@ -90,8 +113,35 @@ export function DeliveryEstimator({
       { weekday: "short", day: "numeric", month: "short" }
     );
 
-  const freeShipping = productPrice >= FREE_SHIPPING_THRESHOLD;
+  const freeShipping = subtotal >= FREE_SHIPPING_THRESHOLD;
 
+  // ── Controlled (checkout): compact inline result, no input ──
+  if (controlled) {
+    if (loading) {
+      return (
+        <p className="flex items-center gap-2 text-sm text-warm-gray">
+          <Loader2 size={15} className="animate-spin" /> Checking delivery date…
+        </p>
+      );
+    }
+    if (!rate || !deliveryDate) return null;
+    return (
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-green-50 px-4 py-2.5 text-sm text-obsidian">
+        <PackageCheck size={16} className="text-green-600" />
+        Delivery by <span className="font-semibold">{deliveryDate}</span>
+        <span className="text-warm-gray">
+          · via {rate.courier} ·{" "}
+          {freeShipping ? (
+            <span className="text-green-600">Free shipping</span>
+          ) : (
+            `${formatPrice(rate.fee, "INR")} shipping`
+          )}
+        </span>
+      </div>
+    );
+  }
+
+  // ── Uncontrolled (product page): full widget with its own input ──
   return (
     <div className="rounded-xl border border-border bg-pearl/60 p-5">
       <div className="flex items-center gap-2 text-sm font-medium text-obsidian">
