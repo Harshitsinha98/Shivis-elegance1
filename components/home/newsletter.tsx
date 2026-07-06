@@ -26,7 +26,7 @@ export function Newsletter() {
           className="flex flex-col gap-3 sm:flex-row"
         >
           {done ? (
-            <p className="flex items-center gap-2 text-champagne">
+            <p className="flex items-center gap-2 text-champagne-light">
               <Check size={18} /> You're on the list. Welcome to Shivis Elegance.
             </p>
           ) : (
@@ -37,7 +37,7 @@ export function Newsletter() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="flex-1 rounded-full border border-ivory/20 bg-transparent px-6 py-3 text-sm text-ivory placeholder:text-ivory/40 focus:border-champagne focus:outline-none"
+                className="flex-1 rounded-full border border-ivory/20 bg-transparent px-6 py-3 text-sm text-ivory placeholder:text-ivory/40 focus:border-champagne-light focus:outline-none"
               />
               <Button type="submit">Subscribe</Button>
             </>

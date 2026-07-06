@@ -1,4 +1,5 @@
 import type { CategorySlug } from "@/types/product";
+import { CATEGORY_DATA } from "@/lib/mock-data";
 
 export const SITE = {
   name: "Shivis Elegance",
@@ -110,6 +111,54 @@ export const CRAFTSMANSHIP_POINTS = [
     desc: "Free resizing, cleaning and re-polishing for as long as you own the piece.",
   },
 ];
+
+export interface MegaMenuColumn {
+  title: string;
+  items: { label: string; href: string }[];
+}
+
+export interface MegaMenuEntry {
+  slug: CategorySlug;
+  name: string;
+  columns: MegaMenuColumn[];
+  promo: { image: string; title: string; description: string; href: string };
+}
+
+/** Hover mega-menu content per category — shop-by-metal / shop-by-stone columns plus a promo tile. */
+export const MEGA_MENU: MegaMenuEntry[] = CATEGORY_DATA.map((cat) => ({
+  slug: cat.slug,
+  name: cat.name,
+  columns: [
+    {
+      title: "Shop by Metal",
+      items: METALS.map((m) => ({
+        label: m.label,
+        href: `/shop?category=${cat.slug}&metal=${m.value}`,
+      })),
+    },
+    {
+      title: "Shop by Stone",
+      items: GEMSTONES.filter((g) => g.value !== "none").map((g) => ({
+        label: g.label,
+        href: `/shop?category=${cat.slug}&gemstone=${g.value}`,
+      })),
+    },
+    {
+      title: "Popular",
+      items: [
+        { label: `All ${cat.name}`, href: `/shop?category=${cat.slug}` },
+        { label: "New Arrivals", href: `/new-arrivals?category=${cat.slug}` },
+        { label: "Best Sellers", href: `/best-sellers?category=${cat.slug}` },
+      ],
+    },
+  ],
+  promo: {
+    image: cat.image,
+    title: cat.name,
+    description: cat.description,
+    href: `/shop?category=${cat.slug}`,
+  },
+}));
 
 /** Placeholder press mentions — swap for real logos/links when available. */
 export const PRESS_MENTIONS = [

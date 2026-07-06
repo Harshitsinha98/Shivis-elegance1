@@ -13,18 +13,46 @@ export function ShopClient({ products }: { products: Product[] }) {
   const params = useSearchParams();
   const category = params.get("category") ?? undefined;
   const q = params.get("q") ?? undefined;
+  const metal = params.get("metal") ?? undefined;
+  const gemstone = params.get("gemstone") ?? undefined;
+  const maxPrice = params.get("maxPrice") ? Number(params.get("maxPrice")) : null;
+  const sortParam = params.get("sort") ?? undefined;
 
   const { filters, filtered, toggleIn, setField, reset, activeCount } = useProductFilters(
     products,
-    { categories: category ? [category] : [], q: q ?? "" }
+    {
+      categories: category ? [category] : [],
+      metals: metal ? [metal] : [],
+      gemstones: gemstone ? [gemstone] : [],
+      maxPrice,
+      sort: sortParam ?? "featured",
+      q: q ?? "",
+    }
   );
 
   // useProductFilters only reads its `initial` filters on first mount, so
-  // navigating between category/search links while already on /shop (no
-  // remount) left the previous filter applied. Re-sync when the URL changes.
+  // navigating between links while already on /shop (no remount) left the
+  // previous filter applied. Re-sync every facet when the URL changes — this
+  // is what makes the homepage's category/metal/gemstone/price tiles work.
   useEffect(() => {
     setField("categories", category ? [category] : []);
   }, [category, setField]);
+
+  useEffect(() => {
+    setField("metals", metal ? [metal] : []);
+  }, [metal, setField]);
+
+  useEffect(() => {
+    setField("gemstones", gemstone ? [gemstone] : []);
+  }, [gemstone, setField]);
+
+  useEffect(() => {
+    setField("maxPrice", maxPrice);
+  }, [maxPrice, setField]);
+
+  useEffect(() => {
+    if (sortParam) setField("sort", sortParam);
+  }, [sortParam, setField]);
 
   useEffect(() => {
     setField("q", q ?? "");

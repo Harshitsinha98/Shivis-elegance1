@@ -149,7 +149,7 @@ export function ScanClient() {
                   type="button"
                   onClick={() => setMode(m)}
                   className={`rounded-md px-3 py-2 text-xs font-medium capitalize transition ${
-                    mode === m ? "bg-champagne text-obsidian" : "text-warm-gray hover:text-obsidian"
+                    mode === m ? "bg-champagne text-pearl" : "text-warm-gray hover:text-obsidian"
                   }`}
                 >
                   {m === "add" ? "Add to" : "Set to"}

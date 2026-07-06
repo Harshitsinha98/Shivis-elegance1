@@ -11,14 +11,16 @@ import {
   Coins,
   Wand2,
   Smartphone,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/shared/loading-screen";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
-import { sendPhoneOtp, confirmPhoneOtp } from "@/lib/firebase/auth-actions";
+import { sendPhoneOtp, confirmPhoneOtp, sendEmailLink } from "@/lib/firebase/auth-actions";
 import type { ConfirmationResult } from "firebase/auth";
 
-type Step = "identifier" | "code";
+type Mode = "phone" | "email";
+type Step = "identifier" | "code" | "email-sent";
 
 /** Normalise a phone number to E.164 (defaults to +91). Emails are rejected. */
 function classifyPhone(raw: string): string | null {
@@ -33,11 +35,14 @@ export function SignInForm() {
   const redirectTo = params.get("redirect") || "";
   const firebaseOn = isFirebaseConfigured();
 
+  const [mode, setMode] = useState<Mode>("phone");
   const [step, setStep] = useState<Step>("identifier");
   const [phoneInput, setPhoneInput] = useState("");
   const [phoneValue, setPhoneValue] = useState("");
+  const [emailInput, setEmailInput] = useState("");
   const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
   const [devCode, setDevCode] = useState<string | null>(null);
+  const [smsFallbackReason, setSmsFallbackReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -76,6 +81,7 @@ export function SignInForm() {
         return;
       }
       setPhoneValue(phone);
+      setSmsFallbackReason(null);
 
       if (firebaseOn) {
         try {
@@ -86,13 +92,34 @@ export function SignInForm() {
         } catch (err) {
           // Firebase SMS can fail when the Phone provider / billing isn't set up
           // in the console. Fall back to the server OTP so sign-in still works.
+          const code = (err as { code?: string })?.code ?? "unknown";
           // eslint-disable-next-line no-console
-          console.warn("Firebase SMS failed, falling back to server OTP:", err);
+          console.warn(`Firebase SMS failed (${code}), falling back to server OTP:`, err);
+          setSmsFallbackReason(code);
         }
       }
 
       await requestServerOtp(phone);
       goToCodeStep();
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Email magic-link request ─────────────────────────────────
+  const requestEmailLink = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setError("");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.trim())) {
+      setError("Enter a valid email address");
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendEmailLink(emailInput.trim());
+      setStep("email-sent");
     } catch (err) {
       setError(friendlyError(err));
     } finally {
@@ -173,36 +200,88 @@ export function SignInForm() {
               Login / Signup to unlock exclusive privileges
             </p>
 
-            <form onSubmit={requestOtp} className="mt-8">
-              <div className="flex items-center gap-1 rounded-full border border-border bg-blush/50 p-1.5 focus-within:border-wine/40">
-                <span className="flex select-none items-center gap-1 rounded-full bg-pearl px-3 py-2.5 text-sm font-medium text-obsidian shadow-sm">
-                  <span className="text-base leading-none">🇮🇳</span>
-                  +91
-                  <ChevronDown size={14} className="text-warm-gray" />
-                </span>
-                <input
-                  name="phone"
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  placeholder="Enter mobile number"
-                  value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value.replace(/[^\d]/g, "").slice(0, 10))}
-                  autoFocus
-                  className="min-w-0 flex-1 bg-transparent px-3 text-[15px] tracking-wide text-obsidian placeholder:text-warm-gray/70 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="shrink-0 rounded-full bg-wine px-6 py-3 text-sm font-medium text-pearl shadow-sm transition hover:bg-wine-dark disabled:opacity-60"
-                >
-                  {loading ? <Spinner /> : "Request OTP"}
-                </button>
-              </div>
-              {error && <p className="mt-3 pl-2 text-sm text-wine">{error}</p>}
-            </form>
+            {mode === "phone" ? (
+              <form onSubmit={requestOtp} className="mt-8">
+                <div className="flex items-center gap-1 rounded-full border border-border bg-blush/50 p-1.5 focus-within:border-wine/40">
+                  <span className="flex select-none items-center gap-1 rounded-full bg-pearl px-3 py-2.5 text-sm font-medium text-obsidian shadow-sm">
+                    <span className="text-base leading-none">🇮🇳</span>
+                    +91
+                    <ChevronDown size={14} className="text-warm-gray" />
+                  </span>
+                  <input
+                    name="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    placeholder="Enter mobile number"
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value.replace(/[^\d]/g, "").slice(0, 10))}
+                    autoFocus
+                    className="min-w-0 flex-1 bg-transparent px-3 text-[15px] tracking-wide text-obsidian placeholder:text-warm-gray/70 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="shrink-0 rounded-full bg-wine px-6 py-3 text-sm font-medium text-pearl shadow-sm transition hover:bg-wine-dark disabled:opacity-60"
+                  >
+                    {loading ? <Spinner /> : "Request OTP"}
+                  </button>
+                </div>
+                {error && <p className="mt-3 pl-2 text-sm text-wine">{error}</p>}
+              </form>
+            ) : (
+              <form onSubmit={requestEmailLink} className="mt-8">
+                <div className="flex items-center gap-1 rounded-full border border-border bg-blush/50 p-1.5 focus-within:border-wine/40">
+                  <span className="flex select-none items-center gap-1 rounded-full bg-pearl px-3 py-2.5 text-warm-gray">
+                    <Mail size={16} />
+                  </span>
+                  <input
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="Enter email address"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    autoFocus
+                    className="min-w-0 flex-1 bg-transparent px-3 text-[15px] tracking-wide text-obsidian placeholder:text-warm-gray/70 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading || !firebaseOn}
+                    className="shrink-0 rounded-full bg-wine px-6 py-3 text-sm font-medium text-pearl shadow-sm transition hover:bg-wine-dark disabled:opacity-60"
+                  >
+                    {loading ? <Spinner /> : "Send link"}
+                  </button>
+                </div>
+                {!firebaseOn && (
+                  <p className="mt-3 pl-2 text-sm text-warm-gray">
+                    Email sign-in isn't configured yet.
+                  </p>
+                )}
+                {error && <p className="mt-3 pl-2 text-sm text-wine">{error}</p>}
+              </form>
+            )}
 
-            <p className="mt-10 text-xs leading-relaxed text-warm-gray">
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === "phone" ? "email" : "phone");
+                setError("");
+              }}
+              className="mt-4 flex items-center gap-2 text-sm text-wine hover:underline"
+            >
+              {mode === "phone" ? (
+                <>
+                  <Mail size={14} /> Sign in with email instead
+                </>
+              ) : (
+                <>
+                  <Smartphone size={14} /> Sign in with phone instead
+                </>
+              )}
+            </button>
+
+            <p className="mt-8 text-xs leading-relaxed text-warm-gray">
               By continuing, I agree to the{" "}
               <a href="/terms" className="font-medium text-wine hover:underline">
                 Terms of Use
@@ -214,6 +293,29 @@ export function SignInForm() {
               .
             </p>
             <div id="recaptcha-container" />
+          </>
+        ) : step === "email-sent" ? (
+          <>
+            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-champagne/15">
+              <Mail size={24} className="text-champagne-dark" />
+            </div>
+            <h1 className="font-display text-4xl leading-tight text-obsidian">
+              Check your email
+            </h1>
+            <p className="mt-2 text-sm text-warm-gray">
+              We sent a sign-in link to{" "}
+              <span className="font-medium text-obsidian">{emailInput}</span>.
+              Open it on this device to continue.
+            </p>
+            <button
+              onClick={() => {
+                setStep("identifier");
+                setError("");
+              }}
+              className="mt-6 flex w-fit items-center gap-2 text-sm text-warm-gray transition hover:text-obsidian"
+            >
+              <ArrowLeft size={15} /> Back
+            </button>
           </>
         ) : (
           <>
@@ -264,6 +366,14 @@ export function SignInForm() {
                 >
                   {devCode}
                 </button>
+                {smsFallbackReason && (
+                  <p className="mt-1.5 text-xs text-warm-gray/80">
+                    Real SMS couldn&apos;t be sent ({smsFallbackReason}).{" "}
+                    {smsFallbackReason === "auth/billing-not-enabled"
+                      ? "Your Firebase project needs the Blaze (pay-as-you-go) plan for real phone numbers."
+                      : "Check the Firebase console for this project."}
+                  </p>
+                )}
               </div>
             )}
 
@@ -355,6 +465,10 @@ function friendlyError(err: unknown): string {
       return "SMS quota exceeded. Please try again later.";
     case "auth/billing-not-enabled":
       return "SMS sign-in isn't enabled yet. Please try again shortly.";
+    case "auth/operation-not-allowed":
+      return "This sign-in method isn't enabled yet. Please try another option.";
+    case "auth/invalid-email":
+      return "That email address looks invalid.";
     default:
       return err instanceof Error && err.message.includes("configured")
         ? "Authentication is not configured."

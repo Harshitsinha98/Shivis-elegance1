@@ -5,9 +5,14 @@
    Enables classes like bg-champagne, text-obsidian, font-display. */
 @theme {
   --color-ivory: #fafaf7;
-  --color-champagne: #c9a96e;
-  --color-champagne-light: #e8d5b0;
-  --color-champagne-dark: #a07840;
+  /* Primary accent is now the house maroon (was champagne gold). The token
+     names are kept so the whole app re-colours from these three values.
+     - champagne       → deep maroon: fills, buttons, borders, icons on light
+     - champagne-dark  → darker maroon: hovers / emphasis on light
+     - champagne-light → light rose: stays legible as text on dark surfaces */
+  --color-champagne: #7b1e2b;
+  --color-champagne-light: #e8c4cb;
+  --color-champagne-dark: #5a1420;
   --color-beige: #f5f0e8;
   --color-cream: #fdf8f0;
   --color-warm-gray: #8c8680;

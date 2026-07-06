@@ -16,24 +16,24 @@ export function Footer() {
           </p>
           <div className="mt-6 space-y-2 text-sm text-ivory/70">
             <p className="flex items-center gap-2">
-              <MapPin size={15} className="text-champagne" /> {SITE.address}
+              <MapPin size={15} className="text-champagne-light" /> {SITE.address}
             </p>
             <p className="flex items-center gap-2">
-              <Phone size={15} className="text-champagne" /> {SITE.phone}
+              <Phone size={15} className="text-champagne-light" /> {SITE.phone}
             </p>
             <p className="flex items-center gap-2">
-              <Mail size={15} className="text-champagne" /> {SITE.email}
+              <Mail size={15} className="text-champagne-light" /> {SITE.email}
             </p>
           </div>
         </div>
 
         {Object.entries(FOOTER_LINKS).map(([group, links]) => (
           <div key={group}>
-            <h4 className="text-xs uppercase tracking-[0.16em] text-champagne">{group}</h4>
+            <h4 className="text-xs uppercase tracking-[0.16em] text-champagne-light">{group}</h4>
             <ul className="mt-4 space-y-3 text-sm text-ivory/70">
               {links.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="transition hover:text-champagne">
+                  <Link href={l.href} className="transition hover:text-champagne-light">
                     {l.label}
                   </Link>
                 </li>
@@ -47,10 +47,10 @@ export function Footer() {
         <div className="container-luxe flex flex-col items-center justify-between gap-4 py-6 text-xs text-ivory/50 md:flex-row">
           <p>© 2026 {SITE.name}. All rights reserved.</p>
           <div className="flex items-center gap-4">
-            <a href={SITE.social.instagram} aria-label="Instagram" className="hover:text-champagne">
+            <a href={SITE.social.instagram} aria-label="Instagram" className="hover:text-champagne-light">
               <Instagram size={18} />
             </a>
-            <a href={SITE.social.facebook} aria-label="Facebook" className="hover:text-champagne">
+            <a href={SITE.social.facebook} aria-label="Facebook" className="hover:text-champagne-light">
               <Facebook size={18} />
             </a>
           </div>

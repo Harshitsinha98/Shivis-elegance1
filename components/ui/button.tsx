@@ -9,7 +9,7 @@ type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-champagne text-obsidian hover:bg-champagne-dark hover:text-pearl shadow-[var(--shadow-card)]",
+    "bg-champagne text-pearl hover:bg-champagne-dark hover:text-pearl shadow-[var(--shadow-card)]",
   outline:
     "border border-obsidian/20 text-obsidian hover:border-champagne hover:text-champagne-dark bg-transparent",
   ghost: "text-obsidian hover:bg-beige",

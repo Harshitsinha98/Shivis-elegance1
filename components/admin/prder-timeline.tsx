@@ -13,7 +13,7 @@ export function OrderTimeline({ events }: { events: OrderTimelineEvent[] }) {
           <span
             className={`absolute -left-[31px] grid h-6 w-6 place-items-center rounded-full border ${
               e.done
-                ? "border-champagne bg-champagne text-obsidian"
+                ? "border-champagne bg-champagne text-pearl"
                 : "border-border bg-ivory text-warm-gray"
             }`}
           >

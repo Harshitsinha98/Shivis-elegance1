@@ -38,7 +38,7 @@ export function AdminSidebar() {
         <Link href="/admin" className="font-display text-2xl tracking-[0.16em]">
           {SITE.name.toUpperCase()}
         </Link>
-        <p className="mt-1 text-[10px] uppercase tracking-[0.24em] text-champagne">Admin Studio</p>
+        <p className="mt-1 text-[10px] uppercase tracking-[0.24em] text-champagne-light">Admin Studio</p>
       </div>
 
       <nav className="flex gap-1 overflow-x-auto p-4 lg:flex-1 lg:flex-col lg:overflow-visible">
@@ -50,7 +50,7 @@ export function AdminSidebar() {
               href={href}
               className={cn(
                 "flex shrink-0 items-center gap-3 rounded-lg px-4 py-2.5 text-sm transition",
-                active ? "bg-champagne text-obsidian" : "text-ivory/70 hover:bg-elegant-gray/40 hover:text-ivory"
+                active ? "bg-champagne text-pearl" : "text-ivory/70 hover:bg-elegant-gray/40 hover:text-ivory"
               )}
             >
               <Icon size={17} />
