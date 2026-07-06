@@ -6,13 +6,18 @@ const STATUS_TONE: Record<OrderStatus, "gold" | "dark" | "muted" | "success" | "
   confirmed: "gold",
   processing: "gold",
   shipped: "dark",
+  out_for_delivery: "gold",
   delivered: "success",
   cancelled: "danger",
   returned: "danger",
 };
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
-  return <Badge tone={STATUS_TONE[status]} className="capitalize">{status}</Badge>;
+  return (
+    <Badge tone={STATUS_TONE[status]} className="capitalize">
+      {status.replace(/_/g, " ")}
+    </Badge>
+  );
 }
 
 const PAYMENT_TONE: Record<PaymentStatus, "gold" | "muted" | "success" | "danger"> = {

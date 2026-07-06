@@ -25,10 +25,12 @@ export function mapShiprocketStatus(current?: string): OrderStatus | null {
   // Cancellations.
   if (s.includes("cancel")) return "cancelled";
 
-  // Anything in the outbound courier pipeline counts as shipped.
+  // Final courier leg — surfaced as its own step.
+  if (s.includes("out for delivery")) return "out_for_delivery";
+
+  // Anything else in the outbound courier pipeline counts as shipped.
   if (
     s.includes("in transit") ||
-    s.includes("out for delivery") ||
     s.includes("picked up") ||
     s.includes("pickup generated") ||
     s.includes("shipped") ||
@@ -321,5 +323,50 @@ export async function createShipment(input: CreateShipmentInput): Promise<Shipme
     // eslint-disable-next-line no-console
     console.error(`[Shiprocket] shipment creation failed, using mock AWB:`, (err as Error).message);
     return mockShipment;
+  }
+}
+
+/**
+ * Cancel a shipment on Shiprocket's side by AWB. Best-effort — never throws.
+ * Used when an order is cancelled in the admin panel so the courier shipment
+ * doesn't stay alive on Shiprocket after the local order is cancelled.
+ */
+export async function cancelShiprocketOrder(
+  awb?: string | null
+): Promise<{ ok: boolean; message?: string }> {
+  if (!isShiprocketEnabled()) {
+    return { ok: false, message: "Shiprocket is not configured" };
+  }
+  if (!awb) {
+    return { ok: false, message: "No AWB on this order" };
+  }
+  // Our own mock AWBs (see mockAwb() above) never reach Shiprocket, so there's
+  // nothing real to cancel there.
+  if (awb.startsWith("LJ")) {
+    return { ok: true, message: "Mock shipment — nothing to cancel on Shiprocket" };
+  }
+
+  const token = await getToken();
+  if (!token) {
+    return { ok: false, message: "Could not authenticate with Shiprocket" };
+  }
+
+  try {
+    const res = await fetch(`${BASE}/courier/cancel/shipment/awb`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ awbs: [awb] }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      // eslint-disable-next-line no-console
+      console.warn(`[Shiprocket] cancel failed: ${res.status} ${body.slice(0, 300)}`);
+      return { ok: false, message: `Shiprocket declined the cancel (${res.status})` };
+    }
+    return { ok: true, message: "Cancelled on Shiprocket" };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[Shiprocket] cancel request failed:", (err as Error).message);
+    return { ok: false, message: "Could not reach Shiprocket to cancel" };
   }
 }

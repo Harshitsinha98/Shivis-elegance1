@@ -171,15 +171,19 @@ export async function updateOrderStatusAction(
   number: string,
   status: OrderStatus,
   trackingNumber?: string
-): Promise<ActionResult> {
+): Promise<ActionResult<{ shiprocketCancel?: { ok: boolean; message?: string } }>> {
   const denied = await assertAdmin();
   if (denied) return denied;
   try {
-    await repo.updateOrderStatus(number, status, trackingNumber || undefined);
+    const { shiprocketCancel } = await repo.updateOrderStatus(
+      number,
+      status,
+      trackingNumber || undefined
+    );
     revalidatePath("/admin/orders");
     revalidatePath(`/admin/orders/${number}`);
     revalidatePath("/admin");
-    return { ok: true };
+    return { ok: true, data: { shiprocketCancel } };
   } catch {
     return { ok: false, error: "Could not update order" };
   }

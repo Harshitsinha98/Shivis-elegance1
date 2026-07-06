@@ -14,6 +14,7 @@ const STATUSES: OrderStatus[] = [
   "confirmed",
   "processing",
   "shipped",
+  "out_for_delivery",
   "delivered",
   "cancelled",
   "returned",
@@ -32,7 +33,12 @@ function StatusControl({ order }: { order: Order }) {
     startTransition(async () => {
       const res = await updateOrderStatusAction(order.number, status, tracking);
       if (!res.ok) alert(res.error);
-      else router.refresh();
+      else {
+        if (res.data?.shiprocketCancel && !res.data.shiprocketCancel.ok) {
+          alert(`Order cancelled locally. ${res.data.shiprocketCancel.message ?? ""}`);
+        }
+        router.refresh();
+      }
     });
   };
 
@@ -45,7 +51,7 @@ function StatusControl({ order }: { order: Order }) {
     >
       {STATUSES.map((s) => (
         <option key={s} value={s} className="capitalize">
-          {s}
+          {s.replace(/_/g, " ")}
         </option>
       ))}
     </select>

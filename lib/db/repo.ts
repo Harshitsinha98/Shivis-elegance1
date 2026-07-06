@@ -7,7 +7,7 @@
  * Mappers convert Prisma rows into the plain `types/*` shapes the UI expects.
  */
 import { prisma, isDbEnabled } from "./prisma";
-import { createShipment } from "@/lib/shipping/shiprocket";
+import { createShipment, cancelShiprocketOrder } from "@/lib/shipping/shiprocket";
 import * as mock from "@/lib/mock-data";
 import type {
   Product,
@@ -107,6 +107,7 @@ const STATUS_TO_DB: Record<OrderStatus, string> = {
   confirmed: "CONFIRMED",
   processing: "PROCESSING",
   shipped: "SHIPPED",
+  out_for_delivery: "OUT_FOR_DELIVERY",
   delivered: "DELIVERED",
   cancelled: "CANCELLED",
   returned: "RETURNED",
@@ -129,6 +130,7 @@ const STATUS_RANK: OrderStatus[] = [
   "confirmed",
   "processing",
   "shipped",
+  "out_for_delivery",
   "delivered",
 ];
 
@@ -155,6 +157,7 @@ export function buildTimeline(
     confirmed: "Order confirmed",
     processing: "Being crafted & packed",
     shipped: trackingNumber ? `Shipped · ${trackingNumber}` : "Shipped",
+    out_for_delivery: "Out for delivery",
     delivered: "Delivered",
   };
   return STATUS_RANK.map((s, i) => ({
@@ -1091,29 +1094,50 @@ export async function listOrders(): Promise<Order[]> {
   return rows.map(mapOrder);
 }
 
+export interface UpdateOrderStatusResult {
+  order: Order | null;
+  /** Only populated when `status === "cancelled"` and an AWB was on file. */
+  shiprocketCancel?: { ok: boolean; message?: string };
+}
+
 export async function updateOrderStatus(
   number: string,
   status: OrderStatus,
   trackingNumber?: string
-): Promise<Order | null> {
-  if (!isDbEnabled()) return null;
+): Promise<UpdateOrderStatusResult> {
+  if (!isDbEnabled()) return { order: null };
   const row = await db().order.update({
     where: { number },
     data: {
       status: STATUS_TO_DB[status] as any,
       ...(trackingNumber ? { trackingNumber } : {}),
-      ...(status === "shipped" ? { shippedAt: new Date() } : {}),
-      ...(status === "shipped" || status === "delivered"
+      ...(status === "shipped" || status === "out_for_delivery"
+        ? { shippedAt: new Date() }
+        : {}),
+      ...(status === "shipped" || status === "out_for_delivery" || status === "delivered"
         ? { paymentStatus: "PAID" as any }
         : {}),
+      ...(status === "cancelled" ? { cancelledAt: new Date() } : {}),
     },
     include: { items: true },
   });
+
   // Moving to shipped without an AWB yet? Auto-assign one now.
   if (status === "shipped" && !row.awb) {
-    return (await assignAwbToOrder(number)) ?? mapOrder(row);
+    return { order: (await assignAwbToOrder(number)) ?? mapOrder(row) };
   }
-  return mapOrder(row);
+
+  // Cancelling: best-effort tell Shiprocket too, so the courier shipment
+  // doesn't stay alive after the local order is cancelled.
+  if (status === "cancelled" && row.awb) {
+    const shiprocketCancel = await cancelShiprocketOrder(row.awb).catch(() => ({
+      ok: false,
+      message: "Could not reach Shiprocket to cancel",
+    }));
+    return { order: mapOrder(row), shiprocketCancel };
+  }
+
+  return { order: mapOrder(row) };
 }
 
 /**

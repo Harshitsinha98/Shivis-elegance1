@@ -91,7 +91,8 @@ const RANK: Record<string, number> = {
   confirmed: 1,
   processing: 2,
   shipped: 3,
-  delivered: 4,
+  out_for_delivery: 4,
+  delivered: 5,
 };
 function isRegression(from: string, to: string): boolean {
   // cancelled / returned are terminal side-states — always allow those.

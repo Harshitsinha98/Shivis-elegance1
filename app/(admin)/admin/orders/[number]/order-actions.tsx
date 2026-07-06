@@ -15,6 +15,7 @@ const STATUSES: OrderStatus[] = [
   "confirmed",
   "processing",
   "shipped",
+  "out_for_delivery",
   "delivered",
   "cancelled",
   "returned",
@@ -24,14 +25,30 @@ export function OrderActions({ order }: { order: Order }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [tracking, setTracking] = useState(order.trackingNumber ?? "");
 
-  const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
+  const run = (
+    fn: () => Promise<{ ok: boolean; error?: string; data?: Record<string, unknown> }>
+  ) => {
     setError(null);
+    setInfo(null);
     startTransition(async () => {
       const res = await fn();
       if (!res.ok) setError(res.error ?? "Something went wrong");
-      else router.refresh();
+      else {
+        const shiprocketCancel = res.data?.shiprocketCancel as
+          | { ok: boolean; message?: string }
+          | undefined;
+        if (shiprocketCancel) {
+          setInfo(
+            shiprocketCancel.ok
+              ? shiprocketCancel.message ?? "Cancelled on Shiprocket"
+              : `Order cancelled locally. ${shiprocketCancel.message ?? "Could not cancel on Shiprocket — cancel it there manually."}`
+          );
+        }
+        router.refresh();
+      }
     });
   };
 
@@ -96,7 +113,7 @@ export function OrderActions({ order }: { order: Order }) {
           className="w-full rounded-lg border border-border bg-ivory px-3 py-2.5 text-sm capitalize focus:border-champagne focus:outline-none disabled:opacity-50"
         >
           {STATUSES.map((s) => (
-            <option key={s} value={s} className="capitalize">{s}</option>
+            <option key={s} value={s} className="capitalize">{s.replace(/_/g, " ")}</option>
           ))}
         </select>
       </div>
@@ -122,6 +139,12 @@ export function OrderActions({ order }: { order: Order }) {
           </Button>
         </div>
       </div>
+
+      {info && (
+        <div className="flex items-center gap-2 rounded-lg border border-champagne/30 bg-blush/40 p-3 text-sm text-obsidian">
+          <AlertCircle size={16} /> {info}
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
