@@ -25,26 +25,26 @@ export default async function AdminDashboard() {
     {
       label: "Revenue (30d)",
       value: formatPrice(stats.revenue30d),
-      Icon: IndianRupee,
+      icon: <IndianRupee className="text-champagne-dark" size={19} />,
       trend: `${formatPrice(stats.revenue)} all-time`,
     },
     {
       label: "Orders (30d)",
       value: String(stats.orderCount30d),
-      Icon: ShoppingCart,
+      icon: <ShoppingCart className="text-champagne-dark" size={19} />,
       trend: `${stats.orderCount} all-time`,
     },
     {
       label: "Products",
       value: String(stats.productCount),
-      Icon: Package,
+      icon: <Package className="text-champagne-dark" size={19} />,
       trend:
         stats.lowStockCount > 0 ? `${stats.lowStockCount} low stock` : "healthy",
     },
     {
       label: "Pending reviews",
       value: String(stats.pendingReviews),
-      Icon: Star,
+      icon: <Star className="text-champagne-dark" size={19} />,
       trend: `${stats.customerCount} customers`,
     },
   ];

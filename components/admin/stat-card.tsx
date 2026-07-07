@@ -1,17 +1,17 @@
 "use client";
 
 import { motion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 interface StatCardProps {
   label: string;
   value: string;
   trend: string;
-  Icon: LucideIcon;
+  icon: ReactNode;
   index: number;
 }
 
-export function StatCard({ label, value, trend, Icon, index }: StatCardProps) {
+export function StatCard({ label, value, trend, icon, index }: StatCardProps) {
   return (
     <motion.div
       className="rounded-2xl border border-border bg-pearl p-5 transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-hover)]"
@@ -21,7 +21,7 @@ export function StatCard({ label, value, trend, Icon, index }: StatCardProps) {
     >
       <div className="flex items-center justify-between">
         <span className="grid h-10 w-10 place-items-center rounded-full bg-champagne/10">
-          <Icon className="text-champagne-dark" size={19} />
+          {icon}
         </span>
         <span className="text-xs text-champagne-dark">{trend}</span>
       </div>
