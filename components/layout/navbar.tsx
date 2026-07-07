@@ -12,7 +12,7 @@ import { AccountMenu } from "./account-menu";
 import { CategoryNav } from "./category-nav";
 
 export function Navbar() {
-  const { scrolled } = useScroll(20);
+  const { scrolled, hidden } = useScroll(20);
   const { openCart, openMobileNav } = useUiStore();
   const { count } = useCart();
   const wishlist = useWishlist();
@@ -21,6 +21,7 @@ export function Navbar() {
     <header
       className={cn(
         "fixed inset-x-0 top-0 z-50 transition-all duration-500",
+        hidden ? "-translate-y-full" : "translate-y-0",
         scrolled
           ? "bg-ivory/90 shadow-[var(--shadow-card)] backdrop-blur-md"
           : "bg-transparent"
@@ -28,15 +29,15 @@ export function Navbar() {
     >
       {/* Announcement bar */}
       <div className="bg-gradient-to-r from-champagne-dark via-champagne to-champagne-dark text-center text-[11px] uppercase tracking-[0.24em] text-pearl">
-        <div className="container-luxe flex items-center justify-center gap-2 py-2">
+        <div className="container-luxe flex items-center justify-center gap-2 py-1.5">
           <span className="hidden sm:inline text-champagne-light">✦</span>
           Complimentary insured shipping on all orders over ₹5,000
           <span className="hidden sm:inline text-champagne-light">✦</span>
         </div>
       </div>
 
-      <nav className="container-luxe flex items-center gap-2 py-3 sm:gap-4 sm:py-4 lg:gap-8">
-        <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+      <nav className="container-luxe flex items-center gap-3 py-2.5 sm:gap-4 sm:py-3">
+        <div className="flex flex-1 shrink-0 items-center gap-3">
           <button
             onClick={openMobileNav}
             className="md:hidden"
@@ -46,30 +47,30 @@ export function Navbar() {
           </button>
           <Link
             href="/"
-            className="whitespace-nowrap font-display text-base tracking-[0.08em] text-champagne transition-colors hover:text-champagne-dark sm:text-xl sm:tracking-[0.18em] lg:text-2xl"
+            className="whitespace-nowrap font-display text-base tracking-[0.08em] text-champagne transition-colors hover:text-champagne-dark sm:text-lg sm:tracking-[0.16em] lg:text-xl"
           >
             {SITE.name.toUpperCase()}
           </Link>
-
-          <button
-            onClick={useUiStore.getState().openSearch}
-            aria-label="Search"
-            className="hidden w-56 items-center gap-2 rounded-full border border-border/70 bg-pearl/60 px-4 py-2 text-left text-xs text-warm-gray/70 transition hover:border-champagne/60 md:flex lg:w-64"
-          >
-            <Search size={16} className="shrink-0 text-warm-gray/60" />
-            <span className="truncate">Search rings, necklaces…</span>
-          </button>
         </div>
 
         <button
           onClick={useUiStore.getState().openSearch}
-          className="ml-auto text-obsidian transition hover:text-champagne-dark md:hidden"
+          aria-label="Search"
+          className="hidden w-full max-w-md flex-1 items-center gap-2 rounded-full border border-border/70 bg-pearl/60 px-4 py-2 text-left text-sm text-warm-gray/70 transition hover:border-champagne/60 md:flex"
+        >
+          <Search size={17} className="shrink-0 text-warm-gray/60" />
+          <span className="truncate">Search for rings, necklaces, diamonds…</span>
+        </button>
+
+        <button
+          onClick={useUiStore.getState().openSearch}
+          className="text-obsidian transition hover:text-champagne-dark md:hidden"
           aria-label="Search"
         >
           <Search size={19} />
         </button>
 
-        <div className="ml-auto flex shrink-0 items-center justify-end gap-3 sm:gap-4">
+        <div className="flex flex-1 shrink-0 items-center justify-end gap-3 sm:gap-4">
           <div className="hidden sm:block">
             <AccountMenu />
           </div>

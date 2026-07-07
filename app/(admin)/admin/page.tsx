@@ -1,9 +1,19 @@
 import Link from "next/link";
-import { IndianRupee, ShoppingCart, Package, Star, ArrowRight } from "lucide-react";
+import {
+  IndianRupee,
+  ShoppingCart,
+  Package,
+  Star,
+  ArrowRight,
+  TrendingUp,
+  Trophy,
+  Receipt,
+} from "lucide-react";
 import { getAdminStats, listOrders } from "@/lib/db/repo";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { AnalyticsChart, BarList } from "@/components/admin/analytics-chart";
 import { OrderStatusBadge } from "@/components/admin/order-status-badge";
+import { StatCard } from "@/components/admin/stat-card";
 
 export const dynamic = "force-dynamic";
 
@@ -47,28 +57,27 @@ export default async function AdminDashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map(({ label, value, Icon, trend }) => (
-          <div key={label} className="rounded-2xl border border-border bg-pearl p-5">
-            <div className="flex items-center justify-between">
-              <Icon className="text-champagne-dark" size={20} />
-              <span className="text-xs text-champagne-dark">{trend}</span>
-            </div>
-            <p className="mt-4 font-display text-3xl text-obsidian">{value}</p>
-            <p className="text-sm text-warm-gray">{label}</p>
-          </div>
+        {cards.map((card, i) => (
+          <StatCard key={card.label} index={i} {...card} />
         ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="rounded-2xl border border-border bg-pearl p-6 lg:col-span-2">
-          <h2 className="font-display text-2xl text-obsidian">Revenue</h2>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="text-champagne-dark" size={18} />
+            <h2 className="font-display text-2xl text-obsidian">Revenue</h2>
+          </div>
           <p className="text-sm text-warm-gray">Monthly paid revenue, in ₹ thousands</p>
           <div className="mt-4">
             <AnalyticsChart data={stats.monthlyRevenue} />
           </div>
         </div>
         <div className="rounded-2xl border border-border bg-pearl p-6">
-          <h2 className="font-display text-2xl text-obsidian">Top sellers</h2>
+          <div className="flex items-center gap-2">
+            <Trophy className="text-champagne-dark" size={18} />
+            <h2 className="font-display text-2xl text-obsidian">Top sellers</h2>
+          </div>
           <p className="text-sm text-warm-gray">By units sold</p>
           <div className="mt-6">
             {stats.topSellers.length > 0 ? (
@@ -82,7 +91,10 @@ export default async function AdminDashboard() {
 
       <div className="rounded-2xl border border-border bg-pearl p-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl text-obsidian">Recent orders</h2>
+          <div className="flex items-center gap-2">
+            <Receipt className="text-champagne-dark" size={18} />
+            <h2 className="font-display text-2xl text-obsidian">Recent orders</h2>
+          </div>
           <Link href="/admin/orders" className="flex items-center gap-1 text-sm text-champagne-dark hover:underline">
             View all <ArrowRight size={14} />
           </Link>
@@ -102,9 +114,19 @@ export default async function AdminDashboard() {
             </thead>
             <tbody>
               {recent.map((o) => (
-                <tr key={o.id} className="border-b border-border/60 last:border-0">
+                <tr
+                  key={o.id}
+                  className="border-b border-border/60 transition last:border-0 hover:bg-champagne/5"
+                >
                   <td className="py-3 font-medium text-obsidian">{o.number}</td>
-                  <td className="py-3 text-elegant-gray">{o.shippingAddress.fullName}</td>
+                  <td className="py-3 text-elegant-gray">
+                    <span className="flex items-center gap-2">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-champagne/15 text-xs font-medium text-champagne-dark">
+                        {o.shippingAddress.fullName.charAt(0).toUpperCase()}
+                      </span>
+                      {o.shippingAddress.fullName}
+                    </span>
+                  </td>
                   <td className="py-3 text-warm-gray">{formatDate(o.createdAt)}</td>
                   <td className="py-3"><OrderStatusBadge status={o.status} /></td>
                   <td className="py-3 text-right text-obsidian">{formatPrice(o.total)}</td>

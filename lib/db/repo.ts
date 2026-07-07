@@ -1130,10 +1130,12 @@ export async function updateOrderStatus(
   // Cancelling: best-effort tell Shiprocket too, so the courier shipment
   // doesn't stay alive after the local order is cancelled.
   if (status === "cancelled" && row.awb) {
-    const shiprocketCancel = await cancelShiprocketOrder(row.awb).catch(() => ({
-      ok: false,
-      message: "Could not reach Shiprocket to cancel",
-    }));
+    const shiprocketCancel = await cancelShiprocketOrder(row.shiprocketOrderId, row.awb).catch(
+      () => ({
+        ok: false,
+        message: "Could not reach Shiprocket to cancel",
+      })
+    );
     return { order: mapOrder(row), shiprocketCancel };
   }
 
@@ -1209,6 +1211,7 @@ export async function assignAwbToOrder(
       courier: shipment.courier,
       trackingNumber: shipment.awb,
       shipmentId: shipment.shipmentId,
+      shiprocketOrderId: shipment.shiprocketOrderId,
       labelUrl: shipment.labelUrl,
     },
     include: { items: true },

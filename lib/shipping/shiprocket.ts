@@ -131,6 +131,8 @@ export interface Shipment {
   trackingUrl: string;
   /** Shiprocket's own shipment id — needed for pickup/label calls */
   shipmentId?: string;
+  /** Shiprocket's own order id — needed for the orders/cancel call */
+  shiprocketOrderId?: string;
   /** Real courier-generated label PDF, when Shiprocket returns one */
   labelUrl?: string;
   mock: boolean;
@@ -260,6 +262,7 @@ export async function createShipment(input: CreateShipmentInput): Promise<Shipme
       shipment_id?: number;
     };
     const shipmentId = created.shipment_id;
+    const shiprocketOrderId = created.order_id;
     if (!shipmentId) throw new Error(`No shipment_id returned: ${JSON.stringify(created).slice(0, 300)}`);
     // eslint-disable-next-line no-console
     console.log(`[Shiprocket] order created — shipment_id=${shipmentId}`);
@@ -288,6 +291,7 @@ export async function createShipment(input: CreateShipmentInput): Promise<Shipme
       courier: courier || "Shiprocket",
       trackingUrl: `https://shiprocket.co/tracking/${awb}`,
       shipmentId: String(shipmentId),
+      shiprocketOrderId: shiprocketOrderId != null ? String(shiprocketOrderId) : undefined,
       mock: false,
     };
 
@@ -327,23 +331,28 @@ export async function createShipment(input: CreateShipmentInput): Promise<Shipme
 }
 
 /**
- * Cancel a shipment on Shiprocket's side by AWB. Best-effort — never throws.
+ * Cancel an order on Shiprocket's side. Best-effort — never throws.
  * Used when an order is cancelled in the admin panel so the courier shipment
  * doesn't stay alive on Shiprocket after the local order is cancelled.
+ *
+ * Shiprocket's cancel endpoint (`POST /orders/cancel`) takes Shiprocket's own
+ * `order_id` (returned from `orders/create/adhoc` as `order_id`) via an `ids`
+ * array — it does NOT accept the AWB or our `shipment_id`.
  */
 export async function cancelShiprocketOrder(
+  shiprocketOrderId?: string | null,
   awb?: string | null
 ): Promise<{ ok: boolean; message?: string }> {
   if (!isShiprocketEnabled()) {
     return { ok: false, message: "Shiprocket is not configured" };
   }
-  if (!awb) {
-    return { ok: false, message: "No AWB on this order" };
-  }
   // Our own mock AWBs (see mockAwb() above) never reach Shiprocket, so there's
   // nothing real to cancel there.
-  if (awb.startsWith("LJ")) {
+  if (awb?.startsWith("LJ")) {
     return { ok: true, message: "Mock shipment — nothing to cancel on Shiprocket" };
+  }
+  if (!shiprocketOrderId) {
+    return { ok: false, message: "No Shiprocket order id on this order" };
   }
 
   const token = await getToken();
@@ -352,10 +361,10 @@ export async function cancelShiprocketOrder(
   }
 
   try {
-    const res = await fetch(`${BASE}/courier/cancel/shipment/awb`, {
+    const res = await fetch(`${BASE}/orders/cancel`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ awbs: [awb] }),
+      body: JSON.stringify({ ids: [Number(shiprocketOrderId)] }),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");

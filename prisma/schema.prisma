@@ -152,10 +152,12 @@ model Order {
   trackingNumber  String?
   awb             String?
   courier         String?
-  // Shiprocket's own shipment id (needed for pickup/label calls) and the real
-  // courier-generated label PDF url from POST /courier/generate/label.
-  shipmentId      String?
-  labelUrl        String?
+  // Shiprocket's own shipment id (needed for pickup/label calls), its own
+  // order id (needed for POST /orders/cancel), and the real courier-generated
+  // label PDF url from POST /courier/generate/label.
+  shipmentId        String?
+  shiprocketOrderId String?
+  labelUrl          String?
   shippedAt       DateTime?
   cancelledAt     DateTime?
   couponCode      String?

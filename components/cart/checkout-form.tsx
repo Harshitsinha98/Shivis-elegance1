@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, Wallet, Banknote, ShieldCheck, ArrowLeft, Mail, Smartphone } from "lucide-react";
+import { CreditCard, Wallet, Banknote, ShieldCheck, ArrowLeft, Mail, Smartphone, Loader2, CheckCircle2 } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/shared/loading-screen";
@@ -10,6 +10,7 @@ import { useCart } from "@/hooks/use-cart";
 import { DeliveryEstimator } from "@/components/product/delivery-estimator";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
 import { sendPhoneOtp, confirmPhoneAndGetIdToken } from "@/lib/firebase/auth-actions";
+import { INDIA_STATES } from "@/lib/india-states";
 import type { ConfirmationResult } from "firebase/auth";
 import type { PaymentProvider } from "@/types/order";
 
@@ -96,6 +97,9 @@ export function CheckoutForm() {
     country: "India",
   });
 
+  // Pincode → city/state auto-fill.
+  const [pincodeStatus, setPincodeStatus] = useState<"idle" | "loading" | "found" | "not-found">("idle");
+
   // Auth state — decides whether we need to verify a guest before ordering.
   const [me, setMe] = useState<Me | null>(null);
   const [authLoaded, setAuthLoaded] = useState(false);
@@ -137,6 +141,35 @@ export function CheckoutForm() {
 
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const lookupPincode = useCallback(async (code: string) => {
+    setPincodeStatus("loading");
+    try {
+      const res = await fetch(`/api/pincode/${code}`);
+      const data = await res.json();
+      if (!data.ok) {
+        setPincodeStatus("not-found");
+        return;
+      }
+      setForm((f) => ({ ...f, city: data.data.city, state: data.data.state }));
+      setPincodeStatus("found");
+    } catch {
+      setPincodeStatus("not-found");
+    }
+  }, []);
+
+  // Debounce-lookup city/state as soon as a valid 6-digit pincode is typed.
+  useEffect(() => {
+    if (form.country !== "India") return;
+    const code = form.postalCode.trim();
+    if (!/^\d{6}$/.test(code)) {
+      setPincodeStatus("idle");
+      return;
+    }
+    const t = setTimeout(() => lookupPincode(code), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.postalCode, form.country]);
 
   const finish = (orderNumber: string) => {
     clear();
@@ -525,17 +558,70 @@ export function CheckoutForm() {
       <section>
         <h3 className="mb-4 font-display text-2xl text-obsidian">Shipping address</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Address line 1" name="line1" value={form.line1} onChange={update("line1")} required className="sm:col-span-2" />
-          <Input label="Address line 2" name="line2" value={form.line2} onChange={update("line2")} className="sm:col-span-2" />
-          <Input label="City" name="city" value={form.city} onChange={update("city")} required />
-          <Input label="State" name="state" value={form.state} onChange={update("state")} required />
-          <Input label="Postal code" name="postalCode" value={form.postalCode} onChange={update("postalCode")} required />
           <Select label="Country" name="country" value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}>
             <option>India</option>
             <option>United States</option>
             <option>United Arab Emirates</option>
             <option>United Kingdom</option>
           </Select>
+
+          <div>
+            <Input
+              label="Pincode"
+              name="postalCode"
+              inputMode="numeric"
+              value={form.postalCode}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, postalCode: e.target.value.replace(/\D/g, "").slice(0, 6) }))
+              }
+              required
+              maxLength={6}
+              placeholder={form.country === "India" ? "6-digit pincode" : undefined}
+            />
+            {form.country === "India" && (
+              <p className="mt-1.5 flex items-center gap-1.5 text-xs">
+                {pincodeStatus === "loading" && (
+                  <span className="flex items-center gap-1.5 text-warm-gray">
+                    <Loader2 size={13} className="animate-spin" /> Finding city &amp; state…
+                  </span>
+                )}
+                {pincodeStatus === "found" && (
+                  <span className="flex items-center gap-1.5 text-green-700">
+                    <CheckCircle2 size={13} /> City &amp; state auto-filled
+                  </span>
+                )}
+                {pincodeStatus === "not-found" && (
+                  <span className="text-warm-gray">Enter city &amp; state manually below</span>
+                )}
+              </p>
+            )}
+          </div>
+
+          <Input label="City" name="city" value={form.city} onChange={update("city")} required />
+
+          {form.country === "India" ? (
+            <Select
+              label="State"
+              name="state"
+              value={form.state}
+              onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
+              required
+            >
+              <option value="" disabled>
+                Select state
+              </option>
+              {INDIA_STATES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <Input label="State" name="state" value={form.state} onChange={update("state")} required />
+          )}
+
+          <Input label="Address line 1" name="line1" value={form.line1} onChange={update("line1")} required className="sm:col-span-2" />
+          <Input label="Address line 2" name="line2" value={form.line2} onChange={update("line2")} className="sm:col-span-2" />
         </div>
         {form.country === "India" && (
           <div className="mt-4">

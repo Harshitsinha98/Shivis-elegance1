@@ -44,7 +44,7 @@ export function CategoryNav() {
       className="relative hidden border-t border-border/60 bg-ivory md:block"
       onMouseLeave={() => setHovered(null)}
     >
-      <ul className="container-luxe flex items-center justify-center gap-0.5 overflow-x-auto py-2 lg:gap-1">
+      <ul className="container-luxe flex items-center justify-between gap-1 overflow-x-auto py-2.5 lg:gap-2">
         {CATEGORIES.map(({ label, href, Icon, slug }) => (
           <li key={label} onMouseEnter={() => setHovered(slug ?? null)}>
             <Link
