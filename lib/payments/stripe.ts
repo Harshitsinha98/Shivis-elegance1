@@ -67,3 +67,37 @@ export async function createStripePaymentIntent(
     mock: false,
   };
 }
+
+/**
+ * Refund a PaymentIntent (full or partial, minor units). Best-effort: when
+ * Stripe is unconfigured or the ref is a mock intent, logs and resolves `ok`
+ * so the local refund/cancel still completes. `paymentRef` is the PaymentIntent
+ * id (`pi_...`).
+ */
+export async function refundStripePayment(
+  paymentRef: string | null | undefined,
+  amount?: number
+): Promise<{ ok: boolean; id?: string; message?: string }> {
+  if (!isStripeEnabled() || !paymentRef || paymentRef.startsWith("pi_mock_")) {
+    console.info(`[stripe] refund stub for ${paymentRef ?? "n/a"} amount=${amount ?? "full"}`);
+    return { ok: true, message: "Refund recorded (Stripe not configured)" };
+  }
+
+  const body = new URLSearchParams({ payment_intent: paymentRef });
+  if (amount) body.set("amount", String(amount));
+
+  const res = await fetch("https://api.stripe.com/v1/refunds", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  if (!res.ok) {
+    return { ok: false, message: `Stripe refund failed: ${res.status} ${await res.text()}` };
+  }
+  const refund = (await res.json()) as { id: string };
+  return { ok: true, id: refund.id };
+}

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { verifyRazorpayWebhook, isRazorpayEnabled } from "@/lib/payments/razorpay";
-import { markOrderPaid } from "@/lib/db/repo";
+import { markOrderPaid, recordWebhookEvent } from "@/lib/db/repo";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +42,14 @@ export async function POST(req: NextRequest) {
     return fail("Invalid payload");
   }
 
+  // Idempotency: Razorpay stamps each delivery with a unique event id. Dedupe on
+  // it so a retried refund/payment webhook is a no-op.
+  const eventId = req.headers.get("x-razorpay-event-id") ?? "";
+  if (eventId) {
+    const fresh = await recordWebhookEvent("razorpay", eventId, event).catch(() => true);
+    if (!fresh) return ok({ received: true, duplicate: true });
+  }
+
   let handled = false;
   switch (event.event) {
     case "order.paid":
@@ -54,6 +62,13 @@ export async function POST(req: NextRequest) {
       }
       break;
     }
+    case "refund.processed":
+    case "refund.failed":
+      // The refund is completed synchronously in our own refund flow; these
+      // events are a reconciliation backstop. Ack (and dedupe above) so
+      // Razorpay stops retrying. Detailed status already lives on the return.
+      handled = true;
+      break;
     case "payment.failed":
       // No paymentRef->order finder yet; acknowledged so Razorpay stops retrying.
       break;

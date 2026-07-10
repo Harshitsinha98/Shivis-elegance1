@@ -12,6 +12,7 @@ import {
   Boxes,
   Star,
   ScanLine,
+  RotateCcw,
   ArrowLeft,
 } from "lucide-react";
 import { SITE } from "@/lib/constants";
@@ -21,6 +22,7 @@ const LINKS = [
   { href: "/admin", label: "Dashboard", Icon: LayoutDashboard },
   { href: "/admin/products", label: "Products", Icon: Package },
   { href: "/admin/orders", label: "Orders", Icon: ShoppingCart },
+  { href: "/admin/returns", label: "Returns", Icon: RotateCcw },
   { href: "/admin/inventory", label: "Inventory", Icon: Boxes },
   { href: "/admin/scan", label: "Quick stock", Icon: ScanLine },
   { href: "/admin/customer", label: "Customers", Icon: Users },

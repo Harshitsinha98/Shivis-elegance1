@@ -10,8 +10,9 @@
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/auth";
 import * as repo from "@/lib/db/repo";
+import { returnStatusUpdateEmail, sendEmail } from "@/lib/notifications/email";
 import type { CategorySlug, Metal, Gemstone } from "@/types/product";
-import type { OrderStatus } from "@/types/order";
+import type { OrderStatus, ReturnStatus } from "@/types/order";
 
 export type ActionResult<T = unknown> =
   | { ok: true; data?: T }
@@ -204,6 +205,231 @@ export async function generateAwbAction(
     return { ok: true, data: { awb: order.awb, courier: order.courier } };
   } catch {
     return { ok: false, error: "Could not generate AWB" };
+  }
+}
+
+// ───────────────────────────── returns ─────────────────────────────
+
+export async function updateReturnStatusAction(
+  id: string,
+  status?: ReturnStatus,
+  adminNotes?: string,
+  refundAmount?: number
+): Promise<ActionResult<{ refund?: { ok: boolean; message?: string } }>> {
+  const denied = await assertAdmin();
+  if (denied) return denied;
+  try {
+    const { returnRequest, refund } = await repo.updateReturnRequestStatus({
+      id,
+      status,
+      adminNotes,
+      refundAmount,
+    });
+    if (status) void sendEmail(returnStatusUpdateEmail(returnRequest, status));
+    revalidatePath("/admin/returns");
+    revalidatePath("/admin/orders");
+    revalidatePath("/admin");
+    return { ok: true, data: { refund } };
+  } catch (e: any) {
+    const msg =
+      e?.message === "INVALID_TRANSITION"
+        ? "That status change isn't allowed."
+        : e?.message === "NOT_FOUND"
+          ? "Return request not found."
+          : "Could not update the return request.";
+    return { ok: false, error: msg };
+  }
+}
+
+// ───────────────── reverse logistics & refund automation ─────────────────
+
+const RETURN_ERROR_COPY: Record<string, string> = {
+  DB_DISABLED: "Returns are unavailable in demo mode.",
+  NOT_FOUND: "Return request not found.",
+  INVALID_TRANSITION: "That action isn't allowed for this return's status.",
+  NO_REVERSE_SHIPMENT: "Create the reverse pickup first.",
+  NO_REVERSE_AWB: "No reverse AWB yet — generate the pickup first.",
+  WAREHOUSE_NOT_RECEIVED: "Mark the item as received at the warehouse before refunding.",
+  COD_NOT_VERIFIED: "COD payout details must be verified before initiating the refund.",
+  NOT_COD: "This isn't a COD order.",
+  NOT_APPROVED: "Approve the return before collecting refund details.",
+  NO_COD_DETAILS: "No payout details have been submitted yet.",
+  REFERENCE_REQUIRED: "A transaction reference is required.",
+  FORBIDDEN: "Not authorised.",
+};
+
+function mapReturnError(e: any): string {
+  const msg: string = e?.message ?? "";
+  if (msg.startsWith("INVALID_DETAILS:")) return msg.slice("INVALID_DETAILS:".length);
+  return RETURN_ERROR_COPY[msg] ?? "Could not complete that action.";
+}
+
+function revalidateReturns() {
+  revalidatePath("/admin/returns");
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin");
+  revalidatePath("/dashboard/returns");
+}
+
+/** Approve a return + auto-create the reverse Shiprocket pickup. */
+export async function approveReturnAction(
+  id: string
+): Promise<ActionResult<{ reverse?: { ok: boolean; mock?: boolean; message?: string } }>> {
+  const denied = await assertAdmin();
+  if (denied) return denied;
+  const session = await getSession();
+  try {
+    const { returnRequest, reverse } = await repo.approveReturnWithReversePickup({
+      id,
+      actor: session?.email ?? "admin",
+    });
+    void sendEmail(returnStatusUpdateEmail(returnRequest, "approved"));
+    revalidateReturns();
+    return { ok: true, data: { reverse } };
+  } catch (e) {
+    return { ok: false, error: mapReturnError(e) };
+  }
+}
+
+/** Reject a return request. */
+export async function rejectReturnAction(id: string, adminNotes?: string): Promise<ActionResult> {
+  const denied = await assertAdmin();
+  if (denied) return denied;
+  try {
+    const { returnRequest } = await repo.updateReturnRequestStatus({ id, status: "rejected", adminNotes });
+    void sendEmail(returnStatusUpdateEmail(returnRequest, "rejected"));
+    revalidateReturns();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: mapReturnError(e) };
+  }
+}
+
+/** Manual fallback: (re)create the reverse pickup/AWB/label. */
+export async function generateReversePickupAction(id: string): Promise<ActionResult> {
+  const denied = await assertAdmin();
+  if (denied) return denied;
+  const session = await getSession();
+  try {
+    const res = await repo.createReverseShipmentForReturn(id, session?.email ?? "admin");
+    revalidateReturns();
+    return res.ok ? { ok: true } : { ok: false, error: res.message ?? "Could not create pickup." };
+  } catch (e) {
+    return { ok: false, error: mapReturnError(e) };
+  }
+}
+
+export async function scheduleReversePickupAction(id: string): Promise<ActionResult> {
+  const denied = await assertAdmin();
+  if (denied) return denied;
+  const session = await getSession();
+  try {
+    const res = await repo.scheduleReversePickupForReturn(id, session?.email ?? "admin");
+    revalidateReturns();
+    return res.ok ? { ok: true } : { ok: false, error: res.message ?? "Could not schedule pickup." };
+  } catch (e) {
+    return { ok: false, error: mapReturnError(e) };
+  }
+}
+
+export async function cancelReversePickupAction(id: string): Promise<ActionResult> {
+  const denied = await assertAdmin();
+  if (denied) return denied;
+  const session = await getSession();
+  try {
+    const res = await repo.cancelReversePickupForReturn(id, session?.email ?? "admin");
+    revalidateReturns();
+    return res.ok ? { ok: true } : { ok: false, error: res.message ?? "Could not cancel pickup." };
+  } catch (e) {
+    return { ok: false, error: mapReturnError(e) };
+  }
+}
+
+export async function refreshReturnTrackingAction(
+  id: string
+): Promise<ActionResult<{ status?: string; message?: string }>> {
+  const denied = await assertAdmin();
+  if (denied) return denied;
+  const session = await getSession();
+  try {
+    const { returnRequest, message } = await repo.refreshReverseTracking(id, session?.email ?? "admin");
+    revalidateReturns();
+    return { ok: true, data: { status: returnRequest.reverseTrackingStatus, message } };
+  } catch (e) {
+    return { ok: false, error: mapReturnError(e) };
+  }
+}
+
+/** Mark the item received at the warehouse (manual fallback) + auto-refund. */
+export async function markWarehouseReceivedAction(
+  id: string
+): Promise<ActionResult<{ refund?: repo.RefundOutcome }>> {
+  const denied = await assertAdmin();
+  if (denied) return denied;
+  const session = await getSession();
+  try {
+    const { refund } = await repo.markWarehouseReceivedAndRefund({
+      id,
+      actor: session?.email ?? "admin",
+      via: session?.email ?? "admin",
+    });
+    revalidateReturns();
+    return { ok: true, data: { refund } };
+  } catch (e) {
+    return { ok: false, error: mapReturnError(e) };
+  }
+}
+
+/** Manual fallback: initiate/retry the refund. */
+export async function initiateRefundAction(
+  id: string
+): Promise<ActionResult<{ refund?: repo.RefundOutcome }>> {
+  const denied = await assertAdmin();
+  if (denied) return denied;
+  const session = await getSession();
+  try {
+    const refund = await repo.initiateReturnRefund({ id, actor: session?.email ?? "admin" });
+    revalidateReturns();
+    if (!refund.ok) return { ok: false, error: refund.message ?? "Refund failed." };
+    return { ok: true, data: { refund } };
+  } catch (e) {
+    return { ok: false, error: mapReturnError(e) };
+  }
+}
+
+/** Finance: verify or reject submitted COD payout details. */
+export async function reviewCodRefundAction(
+  id: string,
+  action: "verify" | "reject",
+  remarks?: string
+): Promise<ActionResult> {
+  const denied = await assertAdmin();
+  if (denied) return denied;
+  const session = await getSession();
+  try {
+    await repo.reviewCodRefundDetails({ id, action, remarks, actor: session?.email ?? "admin" });
+    revalidateReturns();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: mapReturnError(e) };
+  }
+}
+
+/** Finance: mark a COD refund paid out with a transaction reference. */
+export async function markCodRefundProcessedAction(
+  id: string,
+  reference: string,
+  remarks?: string
+): Promise<ActionResult> {
+  const denied = await assertAdmin();
+  if (denied) return denied;
+  const session = await getSession();
+  try {
+    await repo.markCodRefundProcessed({ id, reference, remarks, actor: session?.email ?? "admin" });
+    revalidateReturns();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: mapReturnError(e) };
   }
 }
 

@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getOrderByNumber } from "@/lib/db/repo";
 import { formatPrice, formatDate } from "@/lib/utils";
-import { OrderStatusBadge, PaymentStatusBadge } from "@/components/admin/order-status-badge";
+import {
+  OrderStatusBadge,
+  PaymentStatusBadge,
+  ReturnStatusBadge,
+} from "@/components/admin/order-status-badge";
 import { OrderTimeline } from "@/components/admin/prder-timeline";
 import { OrderActions } from "./order-actions";
 
@@ -80,6 +84,45 @@ export default async function AdminOrderDetailPage({
               {a.phone && <p className="mt-1">📞 {a.phone}</p>}
             </div>
           </div>
+
+          {/* Cancellation reason */}
+          {order.status === "cancelled" && order.cancelReason && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
+              <h3 className="mb-1 font-display text-xl text-obsidian">Cancellation</h3>
+              <p className="text-sm text-warm-gray">
+                <span className="text-obsidian">Reason:</span> {order.cancelReason}
+              </p>
+            </div>
+          )}
+
+          {/* Return request summary */}
+          {order.returnRequest && (
+            <div className="rounded-2xl border border-border bg-pearl p-6">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-display text-xl text-obsidian">Return request</h3>
+                <ReturnStatusBadge status={order.returnRequest.status} />
+              </div>
+              <p className="text-sm text-warm-gray">
+                <span className="text-obsidian">Reason:</span> {order.returnRequest.reason}
+              </p>
+              {order.returnRequest.description && (
+                <p className="mt-1 text-sm text-warm-gray">{order.returnRequest.description}</p>
+              )}
+              <div className="mt-3 space-y-2">
+                {order.returnRequest.items.map((it, i) => (
+                  <p key={i} className="text-sm text-elegant-gray">
+                    {it.name} × {it.quantity}
+                  </p>
+                ))}
+              </div>
+              <Link
+                href="/admin/returns"
+                className="mt-3 inline-block text-sm text-champagne-dark hover:underline"
+              >
+                Manage in Returns →
+              </Link>
+            </div>
+          )}
 
           {/* Timeline */}
           <div className="rounded-2xl border border-border bg-pearl p-6">

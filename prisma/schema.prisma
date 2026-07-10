@@ -25,7 +25,19 @@ enum OrderStatus {
   OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
+  RETURN_REQUESTED
   RETURNED
+}
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  PICKUP_SCHEDULED
+  PICKED_UP
+  REFUND_INITIATED
+  REFUND_COMPLETED
+  COMPLETED
 }
 
 enum PaymentStatus {
@@ -49,6 +61,7 @@ model User {
   orders      Order[]
   reviews     Review[]
   wishlist    WishlistItem[]
+  returnRequests ReturnRequest[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
@@ -159,7 +172,12 @@ model Order {
   shiprocketOrderId String?
   labelUrl          String?
   shippedAt       DateTime?
+  deliveredAt     DateTime?
   cancelledAt     DateTime?
+  cancelReason    String?
+  returnRequestedAt DateTime?
+  returnedAt      DateTime?
+  returnRequests  ReturnRequest[]
   couponCode      String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -177,6 +195,124 @@ model OrderItem {
   variantLabel String?
   unitPrice    Int
   quantity     Int
+  returnItems  ReturnItem[]
+}
+
+model ReturnRequest {
+  id           String       @id @default(cuid())
+  order        Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId      String
+  user         User?        @relation(fields: [userId], references: [id])
+  userId       String?
+  status       ReturnStatus @default(REQUESTED)
+  reason       String
+  description  String?
+  images       String[]
+  adminNotes   String?
+  refundAmount Int? // paise
+  items        ReturnItem[]
+  approvedAt   DateTime?
+  rejectedAt   DateTime?
+  refundedAt   DateTime?
+  completedAt  DateTime?
+
+  // ─────────────── Reverse logistics (Shiprocket reverse pickup) ───────────────
+  // Shiprocket's own ids for the reverse shipment, plus courier/AWB/pickup data.
+  reverseShipmentId     String?
+  reverseOrderId        String?
+  reverseAwb            String?
+  reverseCourier        String?
+  pickupId              String?
+  pickupScheduledDate   DateTime?
+  reverseLabelUrl       String?
+  reverseManifestUrl    String?
+  // Latest free-text courier status (e.g. "Out for pickup") + a normalised code
+  // (see ReverseTrackingCode in the app). Kept as strings so new Shiprocket
+  // statuses never require a migration.
+  reverseTrackingStatus String?
+  reverseTrackingCode   String?
+  reverseTrackingUrl    String?
+  estimatedPickupAt     DateTime?
+  estimatedDeliveryAt   DateTime?
+  // Append-only timeline of reverse-shipment + refund events (JSON array of
+  // { code, label, at, note?, actor? }). Surfaced on both dashboards.
+  timeline              Json?
+  warehouseReceivedAt   DateTime?
+  warehouseReceivedBy   String? // "webhook" | admin email | "system"
+
+  // ─────────────────────────────── Refund ───────────────────────────────
+  refundMethod          String? // "razorpay" | "upi" | "bank" | "cod_manual" | "original"
+  refundStatus          String? // free-text lifecycle: awaiting_details | verification_pending | verified | processing | completed | failed | rejected
+  refundId              String? // gateway refund id (rfnd_... for Razorpay)
+  refundReference       String? // manual transaction reference for COD payouts
+  refundProcessedAt     DateTime?
+  refundAttempts        Int      @default(0)
+  refundError           String?
+  // Idempotency key — a unique constraint is the hard guarantee against
+  // double-refunding the same return even under concurrent requests/webhooks.
+  refundIdempotencyKey  String?  @unique
+
+  // ───────────────── COD refund collection (encrypted PII) ─────────────────
+  // Sensitive values are stored AES-256-GCM encrypted (see lib/security/crypto).
+  upiIdEncrypted        String?
+  bankAccountEncrypted  String? // encrypted JSON { accountNumber }
+  ifscCode              String?
+  bankHolderName        String?
+  bankName              String?
+  financeRemarks        String?
+  financeReviewedAt     DateTime?
+  financeReviewedBy     String?
+
+  // ───────────────────────── Raw provider payloads ─────────────────────────
+  shiprocketWebhookPayload Json?
+  razorpayRefundPayload    Json?
+
+  auditLogs    ReturnAuditLog[]
+
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([reverseAwb])
+  @@index([reverseShipmentId])
+}
+
+/// Append-only audit trail for every financial / logistics action on a return.
+model ReturnAuditLog {
+  id              String        @id @default(cuid())
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  returnRequestId String
+  action          String // e.g. reverse_pickup_created | refund_initiated | cod_details_submitted
+  actor           String? // "system" | "webhook" | admin email | customer id
+  detail          String?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+
+  @@index([returnRequestId])
+}
+
+/// Idempotency ledger for inbound webhooks. A unique (source,eventId) row means
+/// a duplicate delivery is a no-op instead of a double state change.
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  source    String // "shiprocket" | "razorpay"
+  eventId   String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  @@unique([source, eventId])
+}
+
+model ReturnItem {
+  id              String        @id @default(cuid())
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  returnRequestId String
+  orderItem       OrderItem?    @relation(fields: [orderItemId], references: [id])
+  orderItemId     String?
+  // Snapshot so the return line survives even if the order item is removed.
+  name            String
+  image           String
+  unitPrice       Int
+  quantity        Int
 }
 
 model Review {

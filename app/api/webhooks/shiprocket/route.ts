@@ -1,7 +1,15 @@
 import type { NextRequest } from "next/server";
 import { ok } from "@/lib/api";
-import { mapShiprocketStatus } from "@/lib/shipping/shiprocket";
-import { getOrderByAwb, getOrderByNumber, updateOrderStatus } from "@/lib/db/repo";
+import { mapShiprocketStatus, mapReverseStatus } from "@/lib/shipping/shiprocket";
+import {
+  getOrderByAwb,
+  getOrderByNumber,
+  updateOrderStatus,
+  getReturnByReverseAwb,
+  applyReverseTrackingUpdate,
+  recordWebhookEvent,
+} from "@/lib/db/repo";
+import { orderShippingUpdateEmail, sendEmail } from "@/lib/notifications/email";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +54,38 @@ export async function POST(req: NextRequest) {
     return ok({ received: true, authorized: false, matched: false });
   }
 
+  // Idempotency: dedupe repeated deliveries of the same (awb, status) event so
+  // a Shiprocket retry can't double-advance a shipment or re-trigger a refund.
+  const eventKey = `${event.awb ?? event.order_id ?? "?"}:${(event.current_status ?? "").toLowerCase()}`;
+  const fresh = await recordWebhookEvent("shiprocket", eventKey, event).catch(() => true);
+  if (!fresh) {
+    return ok({ received: true, duplicate: true, matched: false });
+  }
+
+  // ── Reverse shipment? Route return-pickup events to the return automation. ──
+  const returnMatch = event.awb
+    ? await getReturnByReverseAwb(event.awb).catch(() => null)
+    : null;
+  if (returnMatch) {
+    const code = mapReverseStatus(event.current_status);
+    const result = await applyReverseTrackingUpdate({
+      id: returnMatch.id,
+      code,
+      rawStatus: event.current_status,
+      actor: "webhook",
+      webhookPayload: event,
+    }).catch(() => null);
+    return ok({
+      received: true,
+      reverse: true,
+      return: returnMatch.id,
+      awb: event.awb,
+      status: event.current_status ?? "unknown",
+      mappedCode: code,
+      refund: result?.refund ?? null,
+    });
+  }
+
   const mapped = mapShiprocketStatus(event.current_status);
 
   // Locate the order: prefer AWB, fall back to the order_id we sent at
@@ -68,10 +108,15 @@ export async function POST(req: NextRequest) {
   // Only move the order forward when the mapped status is a real change, and
   // never regress a delivered/returned order back to shipped.
   if (mapped && mapped !== order.status && !isRegression(order.status, mapped)) {
-    await updateOrderStatus(order.number, mapped, event.awb ?? order.awb).catch(
-      () => null
-    );
+    const result = await updateOrderStatus(
+      order.number,
+      mapped,
+      event.awb ?? order.awb
+    ).catch(() => null);
     updated = true;
+    // Notify the customer on shipping milestones (shipped / out for delivery / delivered).
+    const alert = orderShippingUpdateEmail(result?.order ?? { ...order, status: mapped });
+    if (alert) void sendEmail(alert);
   }
 
   return ok({

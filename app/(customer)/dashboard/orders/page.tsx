@@ -2,8 +2,12 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { ordersForUser } from "@/lib/db/repo";
 import { formatPrice, formatDate } from "@/lib/utils";
-import { OrderStatusBadge } from "@/components/admin/order-status-badge";
+import {
+  OrderStatusBadge,
+  ReturnStatusBadge,
+} from "@/components/admin/order-status-badge";
 import { OrderTimeline } from "@/components/admin/prder-timeline";
+import { CancelOrderDialog } from "@/components/dashboard/cancel-order-dialog";
 
 export const metadata = { title: "My Orders" };
 export const dynamic = "force-dynamic";
@@ -90,6 +94,24 @@ export default async function OrdersPage() {
               <p className="mb-4 text-xs uppercase tracking-[0.14em] text-warm-gray">Status</p>
               <OrderTimeline events={order.timeline} />
             </div>
+          </div>
+
+          {/* Actions + return status */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {order.returnRequest && (
+                <>
+                  <span className="text-xs uppercase tracking-[0.12em] text-warm-gray">
+                    Return
+                  </span>
+                  <ReturnStatusBadge status={order.returnRequest.status} />
+                </>
+              )}
+              {order.status === "cancelled" && order.cancelReason && (
+                <span className="text-sm text-warm-gray">Reason: {order.cancelReason}</span>
+              )}
+            </div>
+            <CancelOrderDialog number={order.number} status={order.status} />
           </div>
         </div>
       ))}

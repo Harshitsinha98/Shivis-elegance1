@@ -5,6 +5,11 @@ import { createRazorpayOrder } from "@/lib/payments/razorpay";
 import { createStripePaymentIntent } from "@/lib/payments/stripe";
 import { getSession } from "@/lib/auth/auth";
 import { createOrder, ordersForUser } from "@/lib/db/repo";
+import {
+  orderPlacedCustomerEmail,
+  orderPlacedAdminEmail,
+  sendEmail,
+} from "@/lib/notifications/email";
 import type {
   OrderItem,
   PaymentProvider,
@@ -101,6 +106,11 @@ export async function POST(req: NextRequest) {
     shippingAddress: body.shippingAddress,
     couponCode: body.couponCode,
   });
+
+  // Fire-and-forget alerts: order confirmation to the customer, new-order to admin.
+  // Best-effort — never blocks or fails the order response.
+  void sendEmail(orderPlacedCustomerEmail(order));
+  void sendEmail(orderPlacedAdminEmail(order));
 
   return ok(
     {

@@ -24,6 +24,9 @@ export const FREE_SHIPPING_THRESHOLD = 500000; // ₹5,000
 export const FLAT_SHIPPING_FEE = 15000; // ₹150
 export const TAX_RATE = 0.03; // 3% GST on jewellery (illustrative)
 
+/** Days after delivery within which a customer may request a return. */
+export const RETURN_WINDOW_DAYS = 5;
+
 export const NAV_LINKS = [
   { label: "Shop All", href: "/shop" },
   { label: "Collections", href: "/collections" },
